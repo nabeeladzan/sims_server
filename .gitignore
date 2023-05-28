@@ -3,3 +3,5 @@
 /f.js
 /key.pem
 /keytmp.pem
+node_modules/
+package-lock.json
