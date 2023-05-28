@@ -1,0 +1,5 @@
+/.env
+/cert.pem
+/f.js
+/key.pem
+/keytmp.pem
