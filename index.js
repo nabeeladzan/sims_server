@@ -26,8 +26,8 @@ const imageUpload = multer({
 
 var con = mysql.createConnection({
     host: "localhost",
-    user: "root",
-    password: "",
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
     database: "sims",
 });
 
