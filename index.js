@@ -77,13 +77,10 @@ app.use(bodyParser.json());
 
 // server home page
 app.get("/", (req, res) => {
-    const id = 1;
-    const sql = "SELECT * FROM users WHERE id = ?";
-    con.query(sql, [id], (err, rows) => {
+    const sql = "SELECT * FROM users";
+    con.query(sql, (err, rows) => {
         if (err) throw err;
-        res.status(200).send(
-            "Welcome to the SIMS API!\nToken: " + rows[0].token
-        );
+        res.status(200).json(rows);
     });
 });
 
