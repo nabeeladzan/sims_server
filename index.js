@@ -69,6 +69,23 @@ class Model {
     }
 }
 
+class Size {
+    constructor(id, size, quantity) {
+        this.id = id;
+        this.size = size;
+        this.quantity = quantity;
+    }
+}
+
+class Stock {
+    constructor(id, name, quantity, sizes) {
+        this.id = id;
+        this.name = name;
+        this.quantity = quantity;
+        this.sizes = sizes;
+    }
+}
+
 app.use(cors());
 
 // Configuring body parser middleware
@@ -291,6 +308,97 @@ app.delete("/deleteModel", authenticateToken, (req, res) => {
         if (err) throw err;
         console.log("1 record deleted");
         res.status(200).json({ message: "Model deleted" });
+    });
+});
+
+// STOCK MANAGEMENT
+app.get("/getStocks", authenticateToken, (req, res) => {
+    const sql = "SELECT * FROM models";
+
+    con.query(sql, (err, models) => {
+        if (err) throw err;
+        const sql2 = "SELECT * FROM sizes";
+        con.query(sql2, (err, sizes) => {
+            if (err) throw err;
+            // generate stock array
+            const stock = [models.length];
+            for (let i = 0; i < models.length; i++) {
+                // get sizes for model
+                const sizeArray = [];
+
+                for (let j = 0; j < sizes.length; j++) {
+                    if (sizes[j].pid == models[i].id) {
+                        sizeArray.push(
+                            new Size(
+                                sizes[j].id,
+                                sizes[j].size,
+                                sizes[j].quantity
+                            )
+                        );
+                    }
+                }
+
+                stock[i] = new Stock(
+                    models[i].id,
+                    models[i].name,
+                    models[i].stock,
+                    sizeArray
+                );
+            }
+
+            res.status(200).json(stock);
+        });
+    });
+});
+
+// - update stock
+app.put("/updateStock", authenticateToken, (req, res) => {
+    const pid = req.body.pid;
+    const id = req.body.id;
+    const stock = req.body.stock;
+
+    const sql = "UPDATE sizes SET quantity = ? WHERE id = ?";
+    const values = [stock, id];
+
+    con.query(sql, values, (err, result) => {
+        if (err) throw err;
+        console.log("1 record updated");
+        res.status(200).json({ message: "Updated stock for size" });
+        con.query(
+            "UPDATE models SET stock = (SELECT SUM(quantity) FROM sizes WHERE pid = ?) WHERE id = ?",
+            [pid, pid],
+            (err, result) => {
+                if (err) throw err;
+                console.log("Updated stock in models table");
+            }
+        );
+    });
+});
+
+// - add size
+app.post("/addSize", authenticateToken, (req, res) => {
+    const pid = req.body.id;
+    const size = req.body.size;
+    const quantity = req.body.quantity;
+
+    const sql = "INSERT INTO sizes (pid, size, quantity) VALUES (?, ?, ?)";
+    const values = [pid, size, quantity];
+
+    con.query(sql, values, (err, result) => {
+        if (err) throw err;
+        console.log("1 record inserted");
+        res.status(200).json({ message: "Size added" });
+    });
+});
+
+// - delete size
+app.delete("/deleteSize", authenticateToken, (req, res) => {
+    const id = req.query.id;
+    const sql = "DELETE FROM sizes WHERE id = ?";
+    con.query(sql, [id], (err, result) => {
+        if (err) throw err;
+        console.log("1 record deleted");
+        res.status(200).json({ message: "Size deleted" });
     });
 });
 
