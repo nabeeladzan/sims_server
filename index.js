@@ -59,11 +59,10 @@ class Message {
 
 // Model class
 class Model {
-    constructor(id, name, price, stock, isActive, pictureUrl) {
+    constructor(id, name, price, isActive, pictureUrl) {
         this.id = id;
         this.name = name;
         this.price = price;
-        this.stock = stock;
         this.isActive = isActive;
         this.pictureUrl = pictureUrl ? pictureUrl : null;
     }
@@ -83,6 +82,15 @@ class Stock {
         this.name = name;
         this.quantity = quantity;
         this.sizes = sizes;
+    }
+}
+
+class Transaction {
+    constructor(id, amount, pid, size) {
+        this.id = id;
+        this.amount = amount;
+        this.sale_price = price;
+        this.pid = pid;
     }
 }
 
@@ -148,6 +156,7 @@ app.post("/registerKey", (req, res) => {
 
                 // Return the hashed token
                 res.status(200).json({
+                    id: user.id,
                     token: jwt,
                     first_name: user.first_name,
                     last_name: user.last_name,
@@ -177,12 +186,12 @@ app.get("/getUsers", authenticateToken, (req, res) => {
 });
 
 // - get user by id
-app.get("/getUser/:id", authenticateToken, (req, res) => {
-    const id = req.params.id;
+app.get("/getUser", authenticateToken, (req, res) => {
+    const id = req.query.id;
     const sql = "SELECT * FROM users WHERE id = ?";
     con.query(sql, [id], (err, rows) => {
         if (err) throw err;
-        res.status(200).json(rows);
+        res.status(200).json(rows[0]);
     });
 });
 
@@ -233,6 +242,45 @@ app.delete("/deleteUser/:id", authenticateToken, (req, res) => {
     });
 });
 
+// change user pin
+app.put("/changePin", authenticateToken, (req, res) => {
+    const id = req.query.id;
+    const old_pin = req.query.old_pin;
+    const new_pin = req.query.new_pin;
+
+    const sql = "SELECT * FROM users WHERE id = ?";
+    con.query(sql, [id], (err, rows) => {
+        if (err) throw err;
+
+        if (rows.length > 0) {
+            const user = new User(
+                rows[0].id,
+                rows[0].first_name,
+                rows[0].last_name,
+                rows[0].token,
+                rows[0].pin
+            );
+
+            if (user.pin === old_pin) {
+                const updateSql = "UPDATE users SET pin = ? WHERE id = ?";
+                const updateValues = [new_pin, user.id];
+
+                con.query(updateSql, updateValues, function (err, result) {
+                    if (err) throw err;
+                    console.log("1 record updated");
+                    res.status(200).json({ message: "Pin changed" });
+                });
+            } else {
+                console.log("Old pin is invalid: " + old_pin);
+                res.status(200).json({ message: "Old pin is invalid" });
+            }
+        } else {
+            console.log("User not found: " + id);
+            res.status(200).json({ message: "User not found" });
+        }
+    });
+});
+
 // MODEL MANAGEMENT
 
 // - get all models
@@ -254,12 +302,17 @@ app.get("/getModels", authenticateToken, (req, res) => {
 });
 
 // - get model by id
-app.get("/getModel/:id", authenticateToken, (req, res) => {
-    const id = req.params.id;
+app.get("/getModel", authenticateToken, (req, res) => {
+    const id = req.query.id;
     const sql = "SELECT * FROM models WHERE id = ?";
     con.query(sql, [id], (err, rows) => {
         if (err) throw err;
-        res.status(200).json(rows);
+        if (rows[0].active === 0) {
+            rows[0].active = false;
+        } else {
+            rows[0].active = true;
+        }
+        res.status(200).json(rows[0]);
     });
 });
 
@@ -267,12 +320,10 @@ app.get("/getModel/:id", authenticateToken, (req, res) => {
 app.post("/addModel", authenticateToken, (req, res) => {
     const name = req.body.name;
     const price = req.body.price;
-    const stock = req.body.stock;
     const active = req.body.active;
 
-    const sql =
-        "INSERT INTO models (name, price, stock, active) VALUES (?, ?, ?, ?)";
-    const values = [name, price, stock, active];
+    const sql = "INSERT INTO models (name, price, active) VALUES (?, ?, ?, ?)";
+    const values = [name, price, active];
 
     con.query(sql, values, (err, result) => {
         if (err) throw err;
@@ -286,12 +337,11 @@ app.put("/updateModel", authenticateToken, (req, res) => {
     const id = req.body.id;
     const name = req.body.name;
     const price = req.body.price;
-    const stock = req.body.stock;
     const active = req.body.active;
 
     const sql =
-        "UPDATE models SET name = ?, price = ?, stock = ?, active = ? WHERE id = ?";
-    const values = [name, price, stock, active, id];
+        "UPDATE models SET name = ?, price = ?, active = ? WHERE id = ?";
+    const values = [name, price, active, id];
 
     con.query(sql, values, (err, result) => {
         if (err) throw err;
@@ -326,8 +376,11 @@ app.get("/getStocks", authenticateToken, (req, res) => {
                 // get sizes for model
                 const sizeArray = [];
 
+                var totalStock = 0;
+
                 for (let j = 0; j < sizes.length; j++) {
                     if (sizes[j].pid == models[i].id) {
+                        totalStock += sizes[j].quantity;
                         sizeArray.push(
                             new Size(
                                 sizes[j].id,
@@ -341,7 +394,7 @@ app.get("/getStocks", authenticateToken, (req, res) => {
                 stock[i] = new Stock(
                     models[i].id,
                     models[i].name,
-                    models[i].stock,
+                    totalStock,
                     sizeArray
                 );
             }
@@ -351,11 +404,20 @@ app.get("/getStocks", authenticateToken, (req, res) => {
     });
 });
 
+//get sizes for model
+app.get("/getSizes", authenticateToken, (req, res) => {
+    const pid = req.query.pid;
+    const sql = "SELECT * FROM sizes WHERE pid = ?";
+    con.query(sql, [pid], (err, rows) => {
+        if (err) throw err;
+        res.status(200).json(rows);
+    });
+});
+
 // - update stock
 app.put("/updateStock", authenticateToken, (req, res) => {
-    const pid = req.body.pid;
-    const id = req.body.id;
-    const stock = req.body.stock;
+    const id = req.query.id;
+    const stock = req.query.stock;
 
     const sql = "UPDATE sizes SET quantity = ? WHERE id = ?";
     const values = [stock, id];
@@ -363,15 +425,8 @@ app.put("/updateStock", authenticateToken, (req, res) => {
     con.query(sql, values, (err, result) => {
         if (err) throw err;
         console.log("1 record updated");
+
         res.status(200).json({ message: "Updated stock for size" });
-        con.query(
-            "UPDATE models SET stock = (SELECT SUM(quantity) FROM sizes WHERE pid = ?) WHERE id = ?",
-            [pid, pid],
-            (err, result) => {
-                if (err) throw err;
-                console.log("Updated stock in models table");
-            }
-        );
     });
 });
 
@@ -399,6 +454,54 @@ app.delete("/deleteSize", authenticateToken, (req, res) => {
         if (err) throw err;
         console.log("1 record deleted");
         res.status(200).json({ message: "Size deleted" });
+    });
+});
+
+// TRANSACTION MANAGEMENT
+
+// - get all transactions
+app.get("/getTransactions", authenticateToken, (req, res) => {
+    const sql = `
+    SELECT transactions.id, models.name, sizes.size, transactions.amount, transactions.sale_price, transactions.created_on
+    FROM transactions
+    JOIN models ON transactions.model_id = models.id
+    JOIN sizes ON transactions.size_id = sizes.id;
+    `;
+
+    con.query(sql, (err, rows) => {
+        if (err) throw err;
+        res.status(200).json(rows);
+    });
+});
+
+// - get transaction by id
+app.get("/getTransaction", authenticateToken, (req, res) => {
+    const id = req.query.id;
+    const sql = "SELECT * FROM transactions WHERE id = ?";
+    con.query(sql, [id], (err, rows) => {
+        if (err) throw err;
+        res.status(200).json(rows);
+    });
+});
+
+// - add transaction
+app.post("/addTransaction", authenticateToken, (req, res) => {
+    const model_id = req.query.model_id;
+    const size_id = req.query.size_id;
+    const amount = req.query.amount;
+    const sale_price = req.query.sale_price;
+
+    const sql = `
+    INSERT INTO transactions (model_id, size_id, amount, sale_price)
+    VALUES (?, ?, ?, ?)
+    `;
+
+    const values = [model_id, size_id, amount, sale_price];
+
+    con.query(sql, values, (err, result) => {
+        if (err) throw err;
+        console.log("1 record inserted");
+        res.status(200).json({ message: "Transaction added" });
     });
 });
 
