@@ -94,6 +94,28 @@ class Transaction {
     }
 }
 
+class InfoModel {
+    constructor(
+        totalProducts,
+        totalStocks,
+        totalSold,
+        totalRevenue,
+        monthlySold,
+        monthlyRevenue,
+        weeklySold,
+        weeklyRevenue
+    ) {
+        this.totalProducts = totalProducts;
+        this.totalStocks = totalStocks;
+        this.totalSold = totalSold;
+        this.totalRevenue = totalRevenue;
+        this.monthlySold = monthlySold;
+        this.monthlyRevenue = monthlyRevenue;
+        this.weeklySold = weeklySold;
+        this.weeklyRevenue = weeklyRevenue;
+    }
+}
+
 app.use(cors());
 
 // Configuring body parser middleware
@@ -170,6 +192,70 @@ app.post("/registerKey", (req, res) => {
             console.log("Key not found: " + key);
             res.status(404).send("Key not found");
         }
+    });
+});
+
+// - get info
+app.get("/getInfo", authenticateToken, (req, res) => {
+    let totalProducts = 0;
+    let totalStocks = 0;
+    let totalSold = 0;
+    let totalRevenue = 0;
+    let monthlySold = 0;
+    let monthlyRevenue = 0;
+    let weeklySold = 0;
+    let weeklyRevenue = 0;
+
+    const sql = "SELECT * FROM models";
+    con.query(sql, (err, rows) => {
+        if (err) throw err;
+        totalProducts = rows.length;
+        const sql2 = "SELECT * FROM sizes";
+        con.query(sql2, (err, rows) => {
+            if (err) throw err;
+            rows.forEach((row) => {
+                row.quantity = parseInt(row.quantity);
+                totalStocks += row.quantity;
+            });
+            const sql3 = "SELECT * FROM transactions";
+            con.query(sql3, (err, rows) => {
+                if (err) throw err;
+                totalSold = rows.length;
+                rows.forEach((row) => {
+                    totalRevenue += row.sale_price;
+                });
+                const sql4 =
+                    "SELECT * FROM transactions WHERE MONTH(created_on) = MONTH(CURRENT_DATE())";
+                con.query(sql4, (err, rows) => {
+                    if (err) throw err;
+                    monthlySold = rows.length;
+                    rows.forEach((row) => {
+                        monthlyRevenue += row.sale_price;
+                    });
+                    const sql5 =
+                        "SELECT * FROM transactions WHERE WEEK(created_on) = WEEK(CURRENT_DATE())";
+                    con.query(sql5, (err, rows) => {
+                        if (err) throw err;
+                        weeklySold = rows.length;
+                        rows.forEach((row) => {
+                            weeklyRevenue += row.sale_price;
+                        });
+                        const info = new InfoModel(
+                            totalProducts,
+                            totalStocks,
+                            totalSold,
+                            totalRevenue,
+                            monthlySold,
+                            monthlyRevenue,
+                            weeklySold,
+                            weeklyRevenue
+                        );
+
+                        res.status(200).json(info);
+                    });
+                });
+            });
+        });
     });
 });
 
@@ -278,6 +364,32 @@ app.put("/changePin", authenticateToken, (req, res) => {
             console.log("User not found: " + id);
             res.status(200).json({ message: "User not found" });
         }
+    });
+});
+
+// MESSAGE MANAGEMENT
+
+// - get all messages
+app.get("/getMessages", authenticateToken, (req, res) => {
+    const sql = "SELECT * FROM messages";
+
+    con.query(sql, (err, rows) => {
+        if (err) throw err;
+        res.status(200).json(rows);
+    });
+});
+
+// - add message
+app.post("/addMessage", authenticateToken, (req, res) => {
+    const message = req.query.message;
+    const user_id = req.query.user_id;
+    const sql = "INSERT INTO messages (user_id, message) VALUES (?, ?)";
+    const values = [user_id, message];
+
+    con.query(sql, values, (err, result) => {
+        if (err) throw err;
+        console.log("1 record inserted");
+        res.status(200).json({ message: "Message added" });
     });
 });
 
