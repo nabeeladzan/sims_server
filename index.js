@@ -371,8 +371,8 @@ app.put("/changePin", authenticateToken, (req, res) => {
 
 // - get all messages
 app.get("/getMessages", authenticateToken, (req, res) => {
-    const sql = "SELECT * FROM messages";
-
+    // messages order by created_on desc
+    const sql = "SELECT * FROM messages ORDER BY created_on DESC";
     con.query(sql, (err, rows) => {
         if (err) throw err;
         res.status(200).json(rows);
