@@ -434,7 +434,7 @@ app.post("/addModel", authenticateToken, (req, res) => {
     const price = req.body.price;
     const active = req.body.active;
 
-    const sql = "INSERT INTO models (name, price, active) VALUES (?, ?, ?, ?)";
+    const sql = "INSERT INTO models (name, price, active) VALUES (?, ?, ?)";
     const values = [name, price, active];
 
     con.query(sql, values, (err, result) => {
